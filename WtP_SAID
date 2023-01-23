@@ -1,0 +1,18 @@
+SELECT
+    (DATE("orders"."activation_time_local")) AS "orders.activation_local_date",
+    "orders"."id" AS "orders.id",
+    COUNT(DISTINCT CASE WHEN (orders.final_status = 'DeliveredStatus') AND (orders.deleted  = 0) THEN "orders"."id" ELSE NULL END) AS "orders.number_of_delivered_orders",
+    (COALESCE(CAST( ( SUM(DISTINCT (CAST(FLOOR(COALESCE( CASE WHEN  "orders"."final_status"  = 'DeliveredStatus' THEN ( 1.0 * (CASE WHEN orders.final_status = 'DeliveredStatus' THEN orders.courier_total_waiting_time_seconds END) / 60 ) ELSE NULL END ,0)*(1000000*1.0)) AS DECIMAL(38,0))) + CAST(STRTOL(LEFT(MD5(CAST( orders.id   AS VARCHAR)),15),16) AS DECIMAL(38,0))* 1.0e8 + CAST(STRTOL(RIGHT(MD5(CAST( orders.id   AS VARCHAR)),15),16) AS DECIMAL(38,0)) ) - SUM(DISTINCT CAST(STRTOL(LEFT(MD5(CAST( orders.id   AS VARCHAR)),15),16) AS DECIMAL(38,0))* 1.0e8 + CAST(STRTOL(RIGHT(MD5(CAST( orders.id   AS VARCHAR)),15),16) AS DECIMAL(38,0))) )  AS DOUBLE PRECISION) / CAST((1000000*1.0) AS DOUBLE PRECISION), 0) / NULLIF(COUNT(DISTINCT CASE WHEN   CASE WHEN  "orders"."final_status"  = 'DeliveredStatus' THEN ( 1.0 * (CASE WHEN orders.final_status = 'DeliveredStatus' THEN orders.courier_total_waiting_time_seconds END) / 60 ) ELSE NULL END  IS NOT NULL THEN  orders.id   ELSE NULL END), 0)) AS "orders.average_courier_total_waiting_time"
+FROM
+    "public"."orders" AS "orders"
+    LEFT JOIN "public"."store_addresses" AS "store_addresses" ON "orders"."store_address_id" = "store_addresses"."id"
+    LEFT JOIN "public"."company_details" AS "company_details" ON "store_addresses"."company_detail_id" = "company_details"."id"
+    LEFT JOIN "public"."stores" AS "stores" ON "store_addresses"."store_id" = "stores"."id"
+    LEFT JOIN "public"."geography" AS "geography" ON "orders"."city_code" = "geography"."code"
+WHERE ((( "orders"."activation_time_local" ) >= ((DATEADD(week,-50, DATE_TRUNC('week', DATE_TRUNC('day',GETDATE())) ))) AND ( "orders"."activation_time_local" ) < ((DATEADD(week,50, DATEADD(week,-50, DATE_TRUNC('week', DATE_TRUNC('day',GETDATE())) ) ))))) AND ((NOT "orders"."is_marketplace" OR "orders"."is_marketplace" IS NULL) AND "store_addresses"."id" = 502597) AND ("company_details"."company_name" LIKE '%DI.ELLE.CI. SRL%' AND ("stores"."store_name" LIKE '%McDonald%' AND "geography"."country_code" = 'IT'))
+GROUP BY
+    1,
+    2
+ORDER BY
+    3 DESC
+LIMIT 500
